@@ -1,0 +1,9 @@
+# Local AI model files
+*.gguf
+*.bin
+models/
+
+# Termux / local runtime files
+*.log
+.env
+.DS_Store
