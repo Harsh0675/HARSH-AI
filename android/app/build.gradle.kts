@@ -11,23 +11,13 @@ android {
         applicationId = "com.harsh.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
-
-        externalNativeBuild {
-            cmake { cppFlags += "-std=c++17" }
-        }
+        versionCode = 2
+        versionName = "1.1.0"
+        externalNativeBuild { cmake { cppFlags += "-std=c++17" } }
     }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
-    }
-
-    externalNativeBuild {
-        cmake { path = file("src/main/cpp/CMakeLists.txt") }
-    }
+    buildTypes { release { isMinifyEnabled = false } }
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
+    packaging { jniLibs { useLegacyPackaging = true } }
 }
 
 kotlin { jvmToolchain(17) }
