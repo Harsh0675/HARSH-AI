@@ -1,9 +1,21 @@
 const $ = (s) => document.querySelector(s);
-const box = $("#messages"), input = $("#input"), history = $("#history");
+const box = $("#messages");
+const input = $("#input");
+const form = $("#form");
+const submitButton = form?.querySelector("button");
+const history = $("#history");
+
 let messages = JSON.parse(localStorage.getItem("harsh_messages") || "[]");
+let sending = false;
 
 function save() {
   localStorage.setItem("harsh_messages", JSON.stringify(messages));
+}
+
+function setSending(next) {
+  sending = next;
+  if (submitButton) submitButton.disabled = next;
+  submitButton && (submitButton.style.opacity = next ? "0.7" : "1");
 }
 
 function render() {
@@ -26,59 +38,77 @@ function add(role, text) {
 }
 
 async function send(text) {
-  if (!text.trim()) return;
+  if (!text.trim() || sending) return;
 
-  messages.push({ role: "user", content: text });
+  const cleaned = text.trim();
+  messages.push({ role: "user", content: cleaned });
   save();
   render();
 
+  setSending(true);
   const out = add("assistant", "");
   let answer = "";
 
-  const r = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
-  });
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+    });
 
-  const reader = r.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-
-    buf += decoder.decode(value, { stream: true });
-    const parts = buf.split("\n\n");
-    buf = parts.pop();
-
-    for (const part of parts) {
-      if (!part.startsWith("data:")) continue;
-
-      const data = part.slice(5).trim();
-      if (data === "[DONE]") continue;
-      if (data.startsWith("ERROR:")) {
-        answer = data;
-        out.textContent = answer;
-        continue;
-      }
-
-      try {
-        const obj = JSON.parse(data);
-        const token = obj.choices?.[0]?.delta?.content || "";
-        answer += token;
-        out.textContent = answer;
-        box.scrollTop = box.scrollHeight;
-      } catch {}
+    if (!r.ok || !r.body) {
+      const msg = await r.text();
+      throw new Error(msg || `Request failed (${r.status})`);
     }
-  }
 
-  messages.push({ role: "assistant", content: answer });
-  save();
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop();
+
+      for (const part of parts) {
+        if (!part.startsWith("data:")) continue;
+
+        const data = part.slice(5).trim();
+        if (!data || data === "[DONE]") continue;
+        if (data.startsWith("ERROR:")) {
+          answer = data.replace(/^ERROR:\s*/, "");
+          out.textContent = answer;
+          continue;
+        }
+
+        try {
+          const obj = JSON.parse(data);
+          const token = obj.choices?.[0]?.delta?.content || "";
+          answer += token;
+          out.textContent = answer;
+          box.scrollTop = box.scrollHeight;
+        } catch (err) {
+          // Ignore malformed JSON chunks from the stream.
+        }
+      }
+    }
+  } catch (error) {
+    answer = error.message || "Something went wrong.";
+    out.textContent = answer;
+  } finally {
+    if (answer.trim()) {
+      messages.push({ role: "assistant", content: answer });
+      save();
+    }
+    setSending(false);
+    input.focus();
+  }
 }
 
-$("#form").onsubmit = (e) => {
+form.onsubmit = (e) => {
   e.preventDefault();
   const v = input.value;
   input.value = "";
@@ -92,10 +122,11 @@ $("#new").onclick = () => {
 };
 
 $("#menu").onclick = () => $("#sidebar").classList.toggle("open");
+
 input.onkeydown = (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    $("#form").requestSubmit();
+    form.requestSubmit();
   }
 };
 
@@ -104,7 +135,9 @@ async function health() {
     const r = await fetch("/health");
     const x = await r.json();
     $("#status").style.color = x.ok ? "#45c477" : "#888";
-  } catch {}
+  } catch {
+    $("#status").style.color = "#888";
+  }
 }
 
 render();

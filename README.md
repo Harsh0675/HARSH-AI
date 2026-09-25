@@ -1,50 +1,62 @@
 # HARSH-AI — Online Chatbot
 
-A minimal production-ready ChatGPT-style web chatbot.
+A production-ready chat web app with a FastAPI backend and OpenAI-compatible LLM proxy.
 
-## What changed
+## Features
 
-- Removed Android/Termux/local llama.cpp-specific files
-- Removed unnecessary folders and scripts
-- Kept only the online frontend + backend
-- API key stays server-side in environment variables
-- Supports any OpenAI-compatible chat API
+- FastAPI backend with streaming chat responses
+- OpenAI-compatible API proxying
+- Server-side secret handling only
+- Frontend chat UI with local history
+- Health check and deployment-ready config
 
-## Deploy
+## Project structure
 
-### Render
-
-Create a Python Web Service from this repository.
-
-Build command:
-```bash
-pip install -r backend/requirements.txt
+```text
+.
+├── backend/
+│   ├── __init__.py
+│   ├── main.py
+│   └── requirements.txt
+├── frontend/
+│   ├── index.html
+│   └── static/
+│       ├── app.js
+│       └── style.css
+├── .env.example
+├── README.md
+├── requirements.txt
+├── render.yaml
+└── main.py
 ```
 
-Start command:
+## Local development
+
 ```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# edit .env with your keys
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Production deployment
+
+Use Render, Railway, Fly.io, or any Python web host:
+
+```bash
+pip install -r backend/requirements.txt
 uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 ```
 
-Set these environment variables in Render:
+Set these environment variables:
 
-```text
+```bash
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_API_KEY=your_api_key
 LLM_MODEL=your_model
+MAX_HISTORY_MESSAGES=30
 ```
 
-Never put the API key in frontend JavaScript.
-
-## Local run
-
-```bash
-pip install -r backend/requirements.txt
-export LLM_BASE_URL=https://api.openai.com/v1
-export LLM_API_KEY=your_api_key
-export LLM_MODEL=your_model
-uvicorn backend.main:app --host 127.0.0.1 --port 8000
-```
-
-Open:
-`http://127.0.0.1:8000`
+Never expose API keys in frontend JavaScript.
